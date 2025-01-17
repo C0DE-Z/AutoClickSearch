@@ -68,11 +68,35 @@ def get_target_window_screenshot():
             print(f"[ERROR] {config['messages']['window_not_found']}")
         return None, None, None
 
+def show_detection_window(screen, matches=None):
+    if not config['display']['enabled']:
+        return
+        
+    display = screen.copy()
+    if matches and config['display']['show_matches']:
+        for pos in matches:
+            x, y = pos
+            cv2.circle(display, (x, y), 5, (0, 255, 0), -1)
+            cv2.circle(display, (x, y), 10, (0, 255, 0), 2)
+    
+    if config['display']['scale'] != 1.0:
+        h, w = display.shape[:2]
+        new_h, new_w = int(h * config['display']['scale']), int(w * config['display']['scale'])
+        display = cv2.resize(display, (new_w, new_h))
+    
+    cv2.imshow(config['display']['window_name'], display)
+    cv2.waitKey(1)
+
+def cleanup():
+    if config['display']['enabled']:
+        cv2.destroyAllWindows()
+
 def process_screen(screen, templates):
     gray_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
     if use_gpu:
         gray_screen = cv2.cuda_GpuMat().upload(gray_screen)
 
+    matches = []
     for filename, template in templates:
         template_gray = cv2.cvtColor(template.download() if use_gpu else template, cv2.COLOR_BGR2GRAY)
         result = cuda.matchTemplate(gray_screen, template_gray, cv2.TM_CCOEFF_NORMED) if use_gpu else cv2.matchTemplate(gray_screen, template_gray, cv2.TM_CCOEFF_NORMED)
@@ -82,9 +106,13 @@ def process_screen(screen, templates):
             x, y = max_loc
             w, h = template_gray.shape[::-1]
             locked_position = (x + w // 2, y + h // 2)
+            matches.append(locked_position)
             if print_enabled:
                 print(f"[INFO] Template '{filename}' matched with confidence {max_val:.2f} at position {locked_position}.")
             return True, locked_position
+
+    if config['display']['enabled']:
+        show_detection_window(screen, matches)
 
     if print_enabled:
         print("[INFO] No templates matched.")
@@ -97,6 +125,9 @@ def detect_screen():
 
     with lock:
         detected, position = process_screen(screen, training_data)
+
+    if config['display']['enabled'] and not detected:
+        show_detection_window(screen)
 
     if detected:
         if print_enabled:
@@ -194,6 +225,12 @@ def adjust_threshold(level):
     TEMPLATE_MATCH_THRESHOLD = level
     print(f"[INFO] Template match threshold adjusted to {level}.")
 
+def toggle_display():
+    config['display']['enabled'] = not config['display']['enabled']
+    if not config['display']['enabled']:
+        cv2.destroyAllWindows()
+    print(f"[INFO] Display window {'enabled' if config['display']['enabled'] else 'disabled'}")
+
 if mode == "4":
     cleanup_training_data()
 else:
@@ -201,6 +238,7 @@ else:
         keyboard.add_hotkey(f'alt+{i}', lambda level=i: adjust_threshold(level * 0.1))
     keyboard.add_hotkey(config['hotkeys']['toggle_detection'], toggle_running)
     keyboard.add_hotkey(config['hotkeys']['toggle_print'], toggle_print)
+    keyboard.add_hotkey('ctrl+shift+d', toggle_display)
     print(f"[INFO] Press {config['hotkeys']['toggle_detection']} to start/stop detection.")
     print(f"[INFO] Press {config['hotkeys']['toggle_print']} to toggle messages.")
     print(f"[INFO] Press {config['hotkeys']['exit']} to exit.")
@@ -208,4 +246,5 @@ else:
     while True:
         if keyboard.is_pressed(config['hotkeys']['exit']):
             print("[INFO] Exiting...")
+            cleanup()
             break
