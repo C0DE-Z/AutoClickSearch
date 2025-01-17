@@ -44,7 +44,7 @@ mode = input("Select mode (1-4): ").strip()
 
 def load_training_data():
     for file in os.listdir("training_data"):
-        if file.startswith("shake_") and file.endswith(".png"):
+        if file.endswith(".png"):
             img = cv2.imread(os.path.join("training_data", file), cv2.IMREAD_COLOR)
             if use_gpu:
                 img = cv2.cuda_GpuMat().upload(img)
@@ -67,6 +67,31 @@ def get_target_window_screenshot():
         if print_enabled:
             print(f"[ERROR] {config['messages']['window_not_found']}")
         return None, None, None
+
+def apply_filters(screen):
+    if not config['filters']['enabled']:
+        return screen
+
+    if config['filters']['grayscale']:
+        screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
+    
+    if config['filters']['blur']:
+        kernel_size = config['filters']['blur_kernel_size']
+        screen = cv2.GaussianBlur(screen, (kernel_size, kernel_size), 0)
+    
+    if config['filters']['invert_colors']:
+        screen = cv2.bitwise_not(screen)
+    
+    return screen
+
+def get_screenshot():
+    if config['record_entire_screen']:
+        screen = np.array(pyautogui.screenshot())
+        if print_enabled:
+            print("[INFO] Captured entire screen.")
+        return screen, 0, 0
+    else:
+        return get_target_window_screenshot()
 
 def show_detection_window(screen, matches=None):
     if not config['display']['enabled']:
@@ -92,7 +117,8 @@ def cleanup():
         cv2.destroyAllWindows()
 
 def process_screen(screen, templates):
-    gray_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
+    screen = apply_filters(screen)
+    gray_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY) if not config['filters']['grayscale'] else screen
     if use_gpu:
         gray_screen = cv2.cuda_GpuMat().upload(gray_screen)
 
@@ -119,9 +145,12 @@ def process_screen(screen, templates):
     return False, None
 
 def detect_screen():
-    screen, x_offset, y_offset = get_target_window_screenshot()
+    screen, x_offset, y_offset = get_screenshot()
     if screen is None:
         return False
+
+    if print_enabled:
+        print("[DEBUG] Screenshot captured. Shape:", screen.shape)
 
     with lock:
         detected, position = process_screen(screen, training_data)
@@ -150,17 +179,21 @@ def save_detection(screen, position):
     detected_region = screen[max(0, center_y - half_h):center_y + half_h, 
                            max(0, center_x - half_w):center_x + half_w]
     timestamp = int(time.time())
-    filename = f"{config['training_data_prefix']}{timestamp}.png"
+    filename = f"detected_{timestamp}.png"
     filepath = os.path.join("training_data", filename)
     cv2.imwrite(filepath, cv2.cvtColor(detected_region, cv2.COLOR_RGB2BGR))
     if print_enabled:
         print(f"[INFO] Saved detection as {filename}")
 
 def detect_text():
-    screen, _, _ = get_target_window_screenshot()
+    screen, _, _ = get_screenshot()
     if screen is None:
         return False
 
+    if print_enabled:
+        print("[DEBUG] Screenshot captured for OCR. Shape:", screen.shape)
+
+    screen = apply_filters(screen)
     text = pytesseract.image_to_string(screen)
     if print_enabled:
         print(f"[INFO] OCR detected text: {text.strip()}")
@@ -231,6 +264,10 @@ def toggle_display():
         cv2.destroyAllWindows()
     print(f"[INFO] Display window {'enabled' if config['display']['enabled'] else 'disabled'}")
 
+def toggle_filters():
+    config['filters']['enabled'] = not config['filters']['enabled']
+    print(f"[INFO] Filters {'enabled' if config['filters']['enabled'] else 'disabled'}")
+
 if mode == "4":
     cleanup_training_data()
 else:
@@ -239,6 +276,7 @@ else:
     keyboard.add_hotkey(config['hotkeys']['toggle_detection'], toggle_running)
     keyboard.add_hotkey(config['hotkeys']['toggle_print'], toggle_print)
     keyboard.add_hotkey('ctrl+shift+d', toggle_display)
+    keyboard.add_hotkey('ctrl+shift+f', toggle_filters)
     print(f"[INFO] Press {config['hotkeys']['toggle_detection']} to start/stop detection.")
     print(f"[INFO] Press {config['hotkeys']['toggle_print']} to toggle messages.")
     print(f"[INFO] Press {config['hotkeys']['exit']} to exit.")

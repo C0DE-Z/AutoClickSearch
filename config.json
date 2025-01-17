@@ -1,16 +1,23 @@
 {
-    "window_title": "Task Manager",
-    "target_text": "Search Text",
-    "text_similarity_threshold": 0.75,
+    "window_title": "Opera GX",
+    "target_text": "Click!",
+    "text_similarity_threshold": 0.65,
     "template_match_threshold": 0.75,
     "use_gpu": false,
     "save_detected_regions": true,
-    "training_data_prefix": "detection_",
-    "click_delay": 0.1,
+    "click_delay": 0.0,
+    "record_entire_screen": true,
     "hotkeys": {
         "toggle_detection": "ctrl+enter",
         "toggle_print": "ctrl+shift+p",
         "exit": "esc"
+    },
+    "filters": {
+        "enabled": false,
+        "grayscale": false,
+        "blur": false,
+        "blur_kernel_size": 5,
+        "invert_colors": false
     },
     "messages": {
         "window_capture": "Captured window at position",
