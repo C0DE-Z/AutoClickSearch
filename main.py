@@ -136,6 +136,7 @@ def apply_filters(screen):
     
     if config['filters']['blur']:
         kernel_size = config['filters']['blur_kernel_size']
+        
         screen = cv2.GaussianBlur(screen, (kernel_size, kernel_size), 0)
     
     if config['filters']['invert_colors']:
@@ -167,15 +168,21 @@ def show_detection_window(screen, matches=None):
     if matches and config['display']['show_matches']:
         for pos in matches:
             x, y = pos
-            cv2.circle(display, (x, y), 5, (0, 255, 0), -1)
-            cv2.circle(display, (x, y), 10, (0, 255, 0), 2)
+            # Get template size for box
+            template_w = training_data[0][1].shape[1]
+            template_h = training_data[0][1].shape[0]
+            # Draw rectangle around detected area
+            cv2.rectangle(display, 
+                        (x - template_w//2, y - template_h//2),
+                        (x + template_w//2, y + template_h//2),
+                        (0, 255, 0), 2)
     
     if config['display']['scale'] != 1.0:
         h, w = display.shape[:2]
         new_h, new_w = int(h * config['display']['scale']), int(w * config['display']['scale'])
         display = cv2.resize(display, (new_w, new_h))
     
-    cv2.imshow(config['display']['window_name'], display)
+    cv2.imshow("Camera Feed", display)
     cv2.waitKey(1)
 
 def cleanup():
@@ -335,11 +342,75 @@ def toggle_filters():
     config['filters']['enabled'] = not config['filters']['enabled']
     print(f"[INFO] Filters {'enabled' if config['filters']['enabled'] else 'disabled'}")
 
+def show_camera_preview():
+    print("[INFO] Showing camera preview. Press 'q' to continue.")
+    while True:
+        frame = camera_manager.get_frame()
+        if frame is not None:
+            display = frame.copy()
+            
+            # Add detection results based on mode
+            if mode == "1" or mode == "3":
+                with lock:
+                    detected, position = process_screen(frame, training_data)
+                if detected:
+                    x, y = position
+                    # Get template size for box
+                    template_w = training_data[0][1].shape[1]
+                    template_h = training_data[0][1].shape[0]
+                    # Draw rectangle around detected area
+                    cv2.rectangle(display, 
+                                (x - template_w//2, y - template_h//2),
+                                (x + template_w//2, y + template_h//2),
+                                (0, 255, 0), 2)
+                    cv2.putText(display, f"Pattern Found", (x - template_w//2, y - template_h//2 - 10),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+            if mode == "2" or mode == "3":
+                # Get all text from image
+                text = pytesseract.image_to_string(frame)
+                words = text.strip().split('\n')
+                
+                # Add background for text overlay
+                h, w = display.shape[:2]
+                overlay = display.copy()
+                cv2.rectangle(overlay, (5, 5), (400, 30 * len(words) + 40), (0, 0, 0), -1)
+                cv2.addWeighted(overlay, 0.3, display, 0.7, 0, display)
+                
+                # Display all detected text
+                y_pos = 30
+                for word in words:
+                    if word.strip():
+                        cv2.putText(display, f"Text: {word}", (10, y_pos),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        y_pos += 30
+                        if print_enabled:
+                            print(f"[INFO] Found text: {word}")
+
+            cv2.imshow("Camera Feed", display)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
 def toggle_camera():
     config['camera']['enabled'] = not config['camera']['enabled']
     if config['camera']['enabled']:
         if camera_manager.start():
             print("[INFO] Camera enabled")
+            print("\nChoose detection mode for camera:")
+            print("1. Visual Pattern Detection")
+            print("2. Text Detection")
+            print("3. Combined Detection")
+            detection_mode = input("Select mode (1-3): ").strip()
+            if detection_mode in ["1", "2", "3"]:
+                global mode
+                mode = detection_mode
+                config['display']['enabled'] = True
+                show_camera_preview()
+                toggle_running()
+            else:
+                print("[ERROR] Invalid mode selected")
+                camera_manager.stop()
+                config['camera']['enabled'] = False
         else:
             config['camera']['enabled'] = False
             print("[ERROR] Failed to enable camera")
@@ -349,6 +420,9 @@ def toggle_camera():
 
 if mode == "5":
     toggle_camera()
+    if not config['camera']['enabled']:
+        print("[INFO] Exiting...")
+        cleanup()
 elif mode == "4":
     cleanup_training_data()
 else:
