@@ -19,6 +19,15 @@
         "blur_kernel_size": 5,
         "invert_colors": false
     },
+    "camera": {
+        "enabled": false,
+        "device_id": 0,
+        "resolution": {
+            "width": 1280,
+            "height": 720
+        },
+        "fps": 30
+    },
     "messages": {
         "window_capture": "Captured window at position",
         "window_not_found": "Target window not found",

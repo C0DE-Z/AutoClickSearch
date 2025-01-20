@@ -15,9 +15,65 @@ from rich.console import Console
 from difflib import SequenceMatcher
 import json
 
+class CameraManager:
+    def __init__(self, config):
+        self.config = config
+        self.camera = None
+        
+    def start(self):
+        if self.config['camera']['enabled'] and not self.camera:
+            self.camera = cv2.VideoCapture(self.config['camera']['device_id'])
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config['camera']['resolution']['width'])
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config['camera']['resolution']['height'])
+            self.camera.set(cv2.CAP_PROP_FPS, self.config['camera']['fps'])
+            if not self.camera.isOpened():
+                print("[ERROR] Failed to open camera")
+                self.camera = None
+                return False
+            return True
+        return False
+    
+    def stop(self):
+        if self.camera:
+            self.camera.release()
+            self.camera = None
+    
+    def get_frame(self):
+        if self.camera and self.camera.isOpened():
+            ret, frame = self.camera.read()
+            if ret:
+                return frame
+        return None
+
 def load_config():
-    with open('config.json', 'r') as f:
-        return json.load(f)
+    default_config = {
+        "camera": {
+            "enabled": False,
+            "device_id": 0,
+            "resolution": {
+                "width": 1280,
+                "height": 720
+            },
+            "fps": 30
+        }
+    }
+    
+    try:
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+            # Ensure camera config exists
+            if 'camera' not in config:
+                config['camera'] = default_config['camera']
+            # Save updated config
+            with open('config.json', 'w') as f:
+                json.dump(config, f, indent=4)
+            return config
+    except FileNotFoundError:
+        print("[ERROR] Config file not found. Using defaults.")
+        return default_config
+    except json.JSONDecodeError:
+        print("[ERROR] Invalid config file. Using defaults.")
+        return default_config
 
 config = load_config()
 console = Console()
@@ -40,7 +96,10 @@ console.log("1. Visual Pattern Detection")
 console.log("2. Text Detection")
 console.log("3. Combined Detection")
 console.log("4. Manage Training Data")
-mode = input("Select mode (1-4): ").strip()
+console.log("5. Toggle Camera")
+mode = input("Select mode (1-5): ").strip()
+
+camera_manager = CameraManager(config)
 
 def load_training_data():
     for file in os.listdir("training_data"):
@@ -85,7 +144,14 @@ def apply_filters(screen):
     return screen
 
 def get_screenshot():
-    if config['record_entire_screen']:
+    if config['camera']['enabled']:
+        frame = camera_manager.get_frame()
+        if frame is not None:
+            if print_enabled:
+                print("[INFO] Captured camera frame")
+            return frame, 0, 0
+        return None, None, None
+    elif config['record_entire_screen']:
         screen = np.array(pyautogui.screenshot())
         if print_enabled:
             print("[INFO] Captured entire screen.")
@@ -115,6 +181,7 @@ def show_detection_window(screen, matches=None):
 def cleanup():
     if config['display']['enabled']:
         cv2.destroyAllWindows()
+    camera_manager.stop()
 
 def process_screen(screen, templates):
     screen = apply_filters(screen)
@@ -268,7 +335,21 @@ def toggle_filters():
     config['filters']['enabled'] = not config['filters']['enabled']
     print(f"[INFO] Filters {'enabled' if config['filters']['enabled'] else 'disabled'}")
 
-if mode == "4":
+def toggle_camera():
+    config['camera']['enabled'] = not config['camera']['enabled']
+    if config['camera']['enabled']:
+        if camera_manager.start():
+            print("[INFO] Camera enabled")
+        else:
+            config['camera']['enabled'] = False
+            print("[ERROR] Failed to enable camera")
+    else:
+        camera_manager.stop()
+        print("[INFO] Camera disabled")
+
+if mode == "5":
+    toggle_camera()
+elif mode == "4":
     cleanup_training_data()
 else:
     for i in range(1, 10):
@@ -277,8 +358,14 @@ else:
     keyboard.add_hotkey(config['hotkeys']['toggle_print'], toggle_print)
     keyboard.add_hotkey('ctrl+shift+d', toggle_display)
     keyboard.add_hotkey('ctrl+shift+f', toggle_filters)
+    keyboard.add_hotkey('ctrl+shift+c', toggle_camera)
+    
+    if config['camera']['enabled']:
+        camera_manager.start()
+    
     print(f"[INFO] Press {config['hotkeys']['toggle_detection']} to start/stop detection.")
     print(f"[INFO] Press {config['hotkeys']['toggle_print']} to toggle messages.")
+    print(f"[INFO] Press Ctrl+Shift+C to toggle camera")
     print(f"[INFO] Press {config['hotkeys']['exit']} to exit.")
 
     while True:
