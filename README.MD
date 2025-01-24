@@ -41,14 +41,16 @@ pip install -r requirements.txt
    {
      "window_title": "Your Window Name",
      "target_text": "Text to Find",
-     "use_gpu": false
+     "use_gpu": false,
+     "feedback_for_ai": false,
+     "screen_cap_toggle": true
    }
    ```
 
 2. Create training data:
-   - Create folder named `training_data`
+   - Create a folder named `training_data`
    - Take screenshots of what you want to click
-   - Save them as PNG files in the training_data folder
+   - Save them as PNG files in the `training_data` folder
    - Name format: `detection_*.png`
 
 3. Choose Detection Mode:
@@ -61,9 +63,13 @@ pip install -r requirements.txt
 With the built-in UI, you can easily modify settings such as detection mode, thresholds, filters, and camera options.
 To launch the editor:
 1. Install ttkbootstrap if not already installed:  
+   ```bash
    pip install ttkbootstrap
+   ```
 2. Run:
+   ```bash
    python config_editor.py
+   ```
 3. Adjust your settings, then click “Save Configuration.”  
 4. Restart or reload the main script to apply your changes.
 
