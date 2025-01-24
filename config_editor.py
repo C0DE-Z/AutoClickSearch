@@ -5,7 +5,7 @@ import os
 import cv2
 import numpy as np
 import threading
-import time
+import time  # Add missing import
 from PIL import Image, ImageTk
 import pyautogui
 import pytesseract
@@ -74,20 +74,20 @@ class DetectionManager:
         self.config = config
         self.camera_manager = CameraManager(config)
         self.running = False
-        self.training_data = load_training_data()
+        self.training_data = load_training_data(config['use_gpu'])
 
     def run_detection(self, mode):
         if mode == "screen":
-            return detect_screen()
+            return detect_screen(self.config, self.training_data, self.config['use_gpu'])
         elif mode == "text":
-            return detect_text()
+            return detect_text(self.config)
         elif mode == "camera":
             frame = self.camera_manager.get_frame()
             if frame is not None:
-                return process_screen(frame, self.training_data)
+                return process_screen(frame, self.training_data, self.config, self.config['use_gpu'])
         elif mode == "combined":
-            detect_screen()
-            detect_text()
+            detect_screen(self.config, self.training_data, self.config['use_gpu'])
+            detect_text(self.config)
         return None, None
 
 class MainApplication:
