@@ -57,6 +57,16 @@ pip install -r requirements.txt
    - Mode 3: Combined (Both methods)
    - Mode 4: Clean training data
 
+## Configuration Editor
+With the built-in UI, you can easily modify settings such as detection mode, thresholds, filters, and camera options.
+To launch the editor:
+1. Install ttkbootstrap if not already installed:  
+   pip install ttkbootstrap
+2. Run:
+   python config_editor.py
+3. Adjust your settings, then click “Save Configuration.”  
+4. Restart or reload the main script to apply your changes.
+
 ## Usage
 
 1. Run the program:
