@@ -78,7 +78,14 @@ def process_screen(screen, templates, config, use_gpu):
     screen = apply_filters(screen, config)
     gray_screen = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY) if not config['filters']['grayscale'] else screen
     if use_gpu:
-        gray_screen = cv2.cuda_GpuMat().upload(gray_screen)
+        try:
+            gray_screen = cv2.cuda_GpuMat().upload(gray_screen)
+        except cv2.error as e:
+            if "No CUDA support" in str(e):
+                print("[bold red]OpenCV was compiled without CUDA support. Falling back to CPU.[/bold red]")
+                use_gpu = False
+            else:
+                raise e
 
     matches = []
     for filename, template in templates:

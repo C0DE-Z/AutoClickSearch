@@ -5,7 +5,7 @@ import os
 import cv2
 import numpy as np
 import threading
-import time  # Add missing import
+import time 
 from PIL import Image, ImageTk
 import pyautogui
 import pytesseract
@@ -338,6 +338,10 @@ class MainApplication:
     def update_visualization(self, frame):
         if not self.config['display']['enabled']:
             return
+            
+        # Ensure the image is in the correct format
+        if frame.dtype != np.uint8:
+            frame = frame.astype(np.uint8)
             
         # Convert CV2 frame to PhotoImage
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
