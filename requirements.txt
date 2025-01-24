@@ -10,3 +10,5 @@ PyGetWindow>=0.0.9
 rich>=10.0.0
 difflib>=0.0.1
 pillow>=8.0.0
+pyinstaller>=5.0.0
+ttkbootstrap>=1.0.0
