@@ -7,6 +7,7 @@ import win32api
 import win32con
 import time
 import os
+import pygetwindow as gw  # Import pygetwindow
 
 class CameraManager:
     def __init__(self, config):
@@ -90,16 +91,17 @@ def process_screen(screen, templates, config, use_gpu):
     matches = []
     for filename, template in templates:
         template_gray = cv2.cvtColor(template.download() if use_gpu else template, cv2.COLOR_BGR2GRAY)
-        result = cv2.matchTemplate(gray_screen, template_gray, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, max_loc = cv2.minMaxLoc(result)
-        
-        if max_val >= config['template_match_threshold']:
-            x, y = max_loc
-            w, h = template_gray.shape[::-1]
-            locked_position = (x + w // 2, y + h // 2)
-            matches.append(locked_position)
-            print(f"[INFO] Template '{filename}' matched with confidence {max_val:.2f} at position {locked_position}.")
-            return True, locked_position
+        if gray_screen.shape[0] >= template_gray.shape[0] and gray_screen.shape[1] >= template_gray.shape[1]:
+            result = cv2.matchTemplate(gray_screen, template_gray, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(result)
+            
+            if max_val >= config['template_match_threshold']:
+                x, y = max_loc
+                w, h = template_gray.shape[::-1]
+                locked_position = (x + w // 2, y + h // 2)
+                matches.append(locked_position)
+                print(f"[INFO] Template '{filename}' matched with confidence {max_val:.2f} at position {locked_position}.")
+                return True, locked_position
 
     print("[INFO] No templates matched.")
     return False, None
@@ -117,7 +119,7 @@ def detect_screen(config, training_data, use_gpu):
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
         
-        if config['save_detected_regions']:
+        if config['feedback_for_ai']:
             save_detection(screen, position, training_data)
         return True
     return False
@@ -136,18 +138,25 @@ def detect_text(config):
     return False
 
 def get_screenshot(config):
-    if config['camera']['enabled']:
+    print(f"[DEBUG] config['camera']['enabled']: {config['camera']['enabled']}")
+    print(f"[DEBUG] config['feedback_for_ai']: {config['feedback_for_ai']}")
+    print(f"[DEBUG] config['screen_cap_toggle']: {config['screen_cap_toggle']}")
+    print(f"[DEBUG] config['record_entire_screen']: {config['record_entire_screen']}")
+    print(f"[DEBUG] config['search_target_window']: {config['search_target_window']}")
+
+    if config['camera']['enabled'] and config['screen_cap_toggle']:
         frame = camera_manager.get_frame()
         if frame is not None:
             print("[INFO] Captured camera frame")
             return frame, 0, 0
         return None, None, None
-    elif config['record_entire_screen']:
+    elif config['screen_cap_toggle']:
         screen = np.array(pyautogui.screenshot())
         print("[INFO] Captured entire screen.")
         return screen, 0, 0
     else:
-        return get_target_window_screenshot(config)
+        print("[INFO] Skipping screenshot capture.")
+        return None, None, None
 
 def get_target_window_screenshot(config):
     try:

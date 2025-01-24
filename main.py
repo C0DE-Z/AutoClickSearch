@@ -33,7 +33,8 @@ def load_config():
                 "height": 720
             },
             "fps": 30
-        }
+        },
+        "search_target_window": True,
     }
     
     try:
@@ -42,6 +43,9 @@ def load_config():
             # Ensure camera config exists
             if 'camera' not in config:
                 config['camera'] = default_config['camera']
+            # Ensure new config options exist
+            if 'search_target_window' not in config:
+                config['search_target_window'] = default_config['search_target_window']
             # Save updated config
             with open('config.json', 'w') as f:
                 json.dump(config, f, indent=4)
@@ -52,6 +56,11 @@ def load_config():
     except json.JSONDecodeError:
         print("[ERROR] Invalid config file. Using defaults.")
         return default_config
+
+def cleanup():
+    if config['display']['enabled']:
+        cv2.destroyAllWindows()
+    camera_manager.stop()
 
 def main():
     config = load_config()

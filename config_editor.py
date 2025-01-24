@@ -25,6 +25,8 @@ def load_config():
             "text_similarity_threshold": 0.65,
             "template_match_threshold": 0.75,
             "use_gpu": False,
+            "feedback_for_ai": False,
+            "screen_cap_toggle": True,
             "save_detected_regions": True,
             "click_delay": 0.0,
             "record_entire_screen": True,
@@ -61,7 +63,8 @@ def load_config():
                 "scale": 0.5,
                 "show_matches": True,
                 "refresh_rate": 30
-            }
+            },
+            "search_target_window": True
         }
 
 def save_config(config):
@@ -153,6 +156,9 @@ class MainApplication:
 
         record_entire_screen = tk.BooleanVar(value=config['record_entire_screen'])
         ttk.Checkbutton(general_frame, text="Record Entire Screen", variable=record_entire_screen).grid(row=8, column=0, padx=10, pady=5, sticky='w')
+
+        search_target_window = tk.BooleanVar(value=config['search_target_window'])
+        ttk.Checkbutton(general_frame, text="Search Target Window", variable=search_target_window).grid(row=9, column=0, padx=10, pady=5, sticky='w')
 
         # Filters settings
         filters_frame = tb.Frame(notebook)
@@ -263,6 +269,7 @@ class MainApplication:
             config['display']['show_matches'] = show_matches.get()
             config['display']['refresh_rate'] = int(refresh_rate.get())
             config['detection_mode'] = detection_mode_var.get()
+            config['search_target_window'] = search_target_window.get()
             save_config(config)
 
         save_button = tb.Button(self.root, text="Save Configuration", bootstyle="success", command=save)
@@ -338,11 +345,15 @@ class MainApplication:
     def update_visualization(self, frame):
         if not self.config['display']['enabled']:
             return
-            
+
+        # Ensure the frame is a valid image
+        if frame is None or not isinstance(frame, np.ndarray):
+            return
+
         # Ensure the image is in the correct format
         if frame.dtype != np.uint8:
             frame = frame.astype(np.uint8)
-            
+
         # Convert CV2 frame to PhotoImage
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         if self.config['display']['scale'] != 1.0:
@@ -350,10 +361,10 @@ class MainApplication:
             new_h = int(h * self.config['display']['scale'])
             new_w = int(w * self.config['display']['scale'])
             frame = cv2.resize(frame, (new_w, new_h))
-            
+
         image = Image.fromarray(frame)
         photo = ImageTk.PhotoImage(image=image)
-        
+
         self.canvas.config(width=photo.width(), height=photo.height())
         self.canvas.create_image(0, 0, image=photo, anchor='nw')
         self.canvas.image = photo
